@@ -111,8 +111,13 @@ struct ContentView: View {
                         .onEnded { value in
                             let newScale = viewModel.validateScale(viewModel.scale * value)
                             viewModel.scale = newScale
-                            viewModel.offset = viewModel.calculateNewOffset(for: newScale, in: geometry)
-                            viewModel.updateOffset(.zero)
+                            
+                            if value < 0.95 && newScale <= viewModel.minScale * 1.05 {
+                                viewModel.resetViewToInitial()
+                            } else {
+                                viewModel.offset = viewModel.calculateNewOffset(for: newScale, in: geometry)
+                                viewModel.updateOffset(.zero)
+                            }
                         },
                     DragGesture(minimumDistance: 0)
                         .updating($dragOffset) { value, state, _ in

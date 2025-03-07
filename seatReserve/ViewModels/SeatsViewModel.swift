@@ -212,10 +212,24 @@ class SeatsViewModel: ObservableObject {
     
     func validateScale(_ newScale: CGFloat) -> CGFloat {
         let validatedScale = min(max(newScale, minScale), maxScale)
+        
+        if newScale < minScale * 1.05 {
+            DispatchQueue.main.async {
+                self.resetViewToInitial()
+            }
+        }
+        
         DispatchQueue.main.async {
             self.calculateDragLimits()
         }
         return validatedScale
+    }
+    
+    func resetViewToInitial() {
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0.5)) {
+            self.scale = 1.0
+            centerSeatsOnScreen(screenWidth: screenSize.width, screenHeight: screenSize.height)
+        }
     }
     
 }
