@@ -18,7 +18,7 @@ struct ContentView: View {
                 Color.white
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        viewModel.selectSeat(nil)
+                        viewModel.clearSelection()
                     }
                 
                 Group {
@@ -61,6 +61,23 @@ struct ContentView: View {
                                                 .onTapGesture {
                                                     viewModel.selectSeat(selectedSeat)
                                                 }
+                                                .popover(
+                                                    isPresented: $viewModel.showPopup,
+                                                    attachmentAnchor: .point(.init(x: 0.5, y: -0.6)),
+                                                    arrowEdge: .bottom,
+                                                    content: {
+                                                        SeatDetailPopupView(
+                                                            seat: selectedSeat,
+                                                            seatSize: viewModel.seatSize
+                                                        )
+                                                        .presentationCompactAdaptation(.popover)
+                                                    }
+                                                )
+                                                .onChange(of: viewModel.showPopup) { newValue in
+                                                    if !newValue {
+                                                        viewModel.selectedSeat = nil
+                                                    }
+                                                }
                                         } else {
                                             Color.clear
                                                 .frame(width: viewModel.seatSize * 1.5, 
@@ -83,6 +100,7 @@ struct ContentView: View {
                     viewModel.calculateOptimalSeatSize(for: newSize)
                 }
             }
+            
             .gesture(
                 SimultaneousGesture(
                     MagnificationGesture()

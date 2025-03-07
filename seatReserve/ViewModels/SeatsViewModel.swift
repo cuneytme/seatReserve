@@ -13,6 +13,8 @@ import SwiftUI
 class SeatsViewModel: ObservableObject {
     @Published var seats: [Seat] = []
     @Published var selectedSeat: Seat?
+    @Published var showPopup: Bool = false
+    @Published var popoverAnchor: PopoverAttachmentAnchor = .rect(.bounds)
     @Published var scale: CGFloat = 1.0
     @Published var offset: CGSize = .zero
     @Published var lastOffset: CGSize = .zero
@@ -92,12 +94,25 @@ class SeatsViewModel: ObservableObject {
         return seats.first { $0.rowPosition == row && $0.columnPosition == column }
     }
     
+    func clearSelection() {
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.7, blendDuration: 0.1)) {
+            self.showPopup = false
+        }
+    }
+    
     func selectSeat(_ seat: Seat?) {
-        withAnimation(.spring()) {
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.7, blendDuration: 0.1)) {
             if selectedSeat?.id == seat?.id {
-                selectedSeat = nil
+                clearSelection()
             } else {
                 selectedSeat = seat
+                if seat != nil {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        withAnimation(.spring(response: 0.25)) {
+                            self.showPopup = true
+                        }
+                    }
+                }
             }
         }
         if let seat = seat {

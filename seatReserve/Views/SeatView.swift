@@ -25,7 +25,7 @@ struct SeatView: View {
                 )
                 .scaleEffect(isSelected ? 2.0 : 1.0)
                 .animation(
-                    .spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0.3),
+                    .spring(response: 0.25, dampingFraction: 0.8, blendDuration: 0.1),
                     value: isSelected
                 )
             
