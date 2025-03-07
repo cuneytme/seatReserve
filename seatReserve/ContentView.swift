@@ -16,27 +16,85 @@ struct ContentView: View {
         GeometryReader { geometry in
             ZStack {
                 Color.white
-                    .edgesIgnoringSafeArea(.all)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         viewModel.selectSeat(nil)
                     }
                 
-                GridLayout
-                    .scaleEffect(viewModel.scale * magnificationRate)
-                    .offset(viewModel.offset)
-                    .offset(dragOffset)
+                Group {
+                    VStack(spacing: viewModel.seatSpacing) {
+                        ForEach(1...viewModel.maxRow, id: \.self) { row in
+                            HStack(spacing: viewModel.seatSpacing) {
+                                ForEach(1...viewModel.maxColumn, id: \.self) { column in
+                                    if let seat = viewModel.getSeatAt(row: row, column: column) {
+                                        if viewModel.selectedSeat?.id != seat.id {
+                                            SeatView(seat: seat, 
+                                                   isSelected: false,
+                                                   size: viewModel.seatSize)
+                                                .onTapGesture {
+                                                    viewModel.selectSeat(seat)
+                                                }
+                                        } else {
+                                            Color.clear
+                                                .frame(width: viewModel.seatSize * 1.5, 
+                                                       height: viewModel.seatSize * 0.8)
+                                        }
+                                    } else {
+                                        Color.clear
+                                            .frame(width: viewModel.seatSize * 1.5, 
+                                                   height: viewModel.seatSize * 0.8)
+                                    }
+                                }
+                                Spacer()
+                            }
+                        }
+                    }
+                    if let selectedSeat = viewModel.selectedSeat {
+                        VStack(spacing: viewModel.seatSpacing) {
+                            ForEach(1...viewModel.maxRow, id: \.self) { row in
+                                HStack(spacing: viewModel.seatSpacing) {
+                                    ForEach(1...viewModel.maxColumn, id: \.self) { column in
+                                        if viewModel.getSeatAt(row: row, column: column)?.id == selectedSeat.id {
+                                            SeatView(seat: selectedSeat, 
+                                                   isSelected: true,
+                                                   size: viewModel.seatSize)
+                                                .onTapGesture {
+                                                    viewModel.selectSeat(selectedSeat)
+                                                }
+                                        } else {
+                                            Color.clear
+                                                .frame(width: viewModel.seatSize * 1.5, 
+                                                       height: viewModel.seatSize * 0.8)
+                                        }
+                                    }
+                                    Spacer()
+                                }
+                            }
+                        }
+                    }
+                }
+                .scaleEffect(viewModel.scale * magnificationRate)
+                .offset(viewModel.offset)
+                .offset(dragOffset)
+                .onAppear {
+                    viewModel.calculateOptimalSeatSize(for: geometry.size)
+                }
+                .onChange(of: geometry.size) { newSize in
+                    viewModel.calculateOptimalSeatSize(for: newSize)
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
             .gesture(
                 SimultaneousGesture(
                     MagnificationGesture()
                         .updating($magnificationRate) { currentState, gestureState, _ in
                             gestureState = currentState
+                            viewModel.updateZoomCenter(geometry.frame(in: .local).center, in: geometry)
                         }
                         .onEnded { value in
-                            viewModel.scale = viewModel.validateScale(viewModel.scale * value)
+                            let newScale = viewModel.validateScale(viewModel.scale * value)
+                            viewModel.scale = newScale
+                            viewModel.offset = viewModel.calculateNewOffset(for: newScale, in: geometry)
+                            viewModel.updateOffset(.zero)
                         },
                     DragGesture(minimumDistance: 0)
                         .updating($dragOffset) { value, state, _ in
@@ -50,28 +108,11 @@ struct ContentView: View {
             )
         }
     }
-    
-    private var GridLayout: some View {
-        VStack(spacing: 24) {
-            ForEach(1...viewModel.maxRow, id: \.self) { row in
-                HStack(spacing: 10) {
-                    ForEach(1...viewModel.maxColumn, id: \.self) { column in
-                        //eger koltuk var ise SeatView'i cagirir yoksa ayni boyutta bos bir view gelir.
-                        if let seat = viewModel.getSeatAt(row: row, column: column) {
-                            SeatView(seat: seat, isSelected: viewModel.selectedSeat?.id == seat.id)
-                                .onTapGesture {
-                                    viewModel.selectSeat(seat)
-                                }
-                        } else {
-                            Color.clear
-                                .frame(width: 40, height: 40)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(.top, -220)
-        .padding(.horizontal, -250)
+}
+
+extension CGRect {
+    var center: CGPoint {
+        CGPoint(x: midX, y: midY)
     }
 }
 

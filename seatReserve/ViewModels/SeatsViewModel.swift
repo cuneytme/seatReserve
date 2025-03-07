@@ -24,6 +24,12 @@ class SeatsViewModel: ObservableObject {
     let minScale: CGFloat = 0.5
     let maxScale: CGFloat = 3.0
     
+    @Published var seatSize: CGFloat = 40.0
+    @Published var seatSpacing: CGFloat = 10.0
+    
+    private var dragLimits: CGRect = .zero
+    private var screenSize: CGSize = .zero
+    
     init() {
         loadSeats()
     }
@@ -48,6 +54,8 @@ class SeatsViewModel: ObservableObject {
         maxColumn = seats.map { $0.columnPosition }.max() ?? 0
     }
     
+    
+    
     func calculateScale() {
         let screenWidth = UIScreen.main.bounds.width
         let screenHeight = UIScreen.main.bounds.height
@@ -56,15 +64,27 @@ class SeatsViewModel: ObservableObject {
         let spacing: CGFloat = 10
         let padding: CGFloat = 16
         
-        let gridWidth = (seatSize * CGFloat(maxColumn)) + (spacing * CGFloat(maxColumn - 1)) + (padding * 2)
-        let gridHeight = (seatSize * CGFloat(maxRow)) + (spacing * CGFloat(maxRow - 1)) + (padding * 2)
+        let gridWidth = (seatSize * 1.5 * CGFloat(maxColumn)) + (spacing * CGFloat(maxColumn - 1))
+        let gridHeight = (seatSize * 0.8 * CGFloat(maxRow)) + (spacing * CGFloat(maxRow - 1))
         
         let widthScale = screenWidth / gridWidth
         let heightScale = screenHeight / gridHeight
         
-        scale = min(widthScale, heightScale) * 0.6
+        scale = min(widthScale, heightScale) * 0.95
         
-        offset = CGSize(width: 0, height: 0)
+        centerSeatsOnScreen(screenWidth: screenWidth, screenHeight: screenHeight)
+    }
+    
+    private func centerSeatsOnScreen(screenWidth: CGFloat, screenHeight: CGFloat) {
+        let totalWidth = (seatSize * 1.5 * CGFloat(maxColumn)) + (seatSpacing * CGFloat(maxColumn - 1))
+        let totalHeight = (seatSize * 0.8 * CGFloat(maxRow)) + (seatSpacing * CGFloat(maxRow - 1))
+        
+        let offsetX = (screenWidth - totalWidth * scale) / 2
+        
+        let verticalAdjustment = screenHeight * 0.1
+        let offsetY = ((screenHeight - totalHeight * scale) / 2) - verticalAdjustment
+        
+        offset = CGSize(width: offsetX, height: offsetY)
         lastOffset = offset
     }
     
@@ -88,15 +108,39 @@ class SeatsViewModel: ObservableObject {
         }
     }
     
-    func validateScale(_ newScale: CGFloat) -> CGFloat {
-        min(max(newScale, minScale), maxScale)
+    func calculateDragLimits() {
+        let totalWidth = (seatSize * 1.5 * CGFloat(maxColumn)) + (seatSpacing * CGFloat(maxColumn - 1))
+        let totalHeight = (seatSize * 0.8 * CGFloat(maxRow)) + (seatSpacing * CGFloat(maxRow - 1))
+        
+        if totalWidth * scale <= screenSize.width && totalHeight * scale <= screenSize.height {
+    
+            let verticalAdjustment = screenSize.height * 0.1
+            let centerX = (screenSize.width - totalWidth * scale) / 2
+            let centerY = ((screenSize.height - totalHeight * scale) / 2) - verticalAdjustment
+            
+            dragLimits = CGRect(x: centerX, y: centerY, width: 0, height: 0)
+        } else {
+            let horizontalLimit = max(0, (totalWidth * scale - screenSize.width) / 2 + screenSize.width * 0.1)
+            
+            let verticalTopLimit = max(0, (totalHeight * scale - screenSize.height) / 2 + screenSize.height * 0.05)
+            let verticalBottomLimit = max(0, (totalHeight * scale - screenSize.height) / 2 + screenSize.height * 0.15)
+            
+            dragLimits = CGRect(x: -horizontalLimit, 
+                              y: -verticalTopLimit, 
+                              width: horizontalLimit * 2, 
+                              height: verticalTopLimit + verticalBottomLimit)
+        }
     }
     
     func updateOffset(_ translation: CGSize) {
-        offset = CGSize(
+        var newOffset = CGSize(
             width: lastOffset.width + translation.width,
             height: lastOffset.height + translation.height
         )
+        newOffset.width = min(max(newOffset.width, dragLimits.minX), dragLimits.maxX)
+        newOffset.height = min(max(newOffset.height, dragLimits.minY), dragLimits.maxY)
+        
+        offset = newOffset
     }
     
     func endDragging() {
@@ -120,4 +164,43 @@ class SeatsViewModel: ObservableObject {
         )
         return newOffset
     }
-} 
+    
+    func calculateOptimalSeatSize(for screenSize: CGSize) {
+        let horizontalPadding: CGFloat = 16
+        let verticalPadding: CGFloat = 16
+        
+        self.screenSize = screenSize
+        
+        let availableWidth = screenSize.width - horizontalPadding
+        let availableHeight = screenSize.height - verticalPadding + (screenSize.height * 0.1)
+        
+        let widthWithSpacing = availableWidth / CGFloat(maxColumn)
+        let widthBasedSpacing = widthWithSpacing * 0.12
+        let widthBasedSeatSize = (widthWithSpacing - widthBasedSpacing) / 1.5
+        
+        let heightWithSpacing = availableHeight / CGFloat(maxRow)
+        let heightBasedSpacing = heightWithSpacing * 0.12
+        let heightBasedSeatSize = (heightWithSpacing - heightBasedSpacing) / 0.8
+        
+        let minSeatSize: CGFloat = 35
+        let maxSeatSize: CGFloat = 70
+        
+        let calculatedSize = min(widthBasedSeatSize, heightBasedSeatSize)
+        seatSize = min(max(calculatedSize, minSeatSize), maxSeatSize)
+        
+        seatSpacing = max(seatSize * 0.1, 5)
+        
+        centerSeatsOnScreen(screenWidth: screenSize.width, screenHeight: screenSize.height)
+        
+        calculateDragLimits()
+    }
+    
+    func validateScale(_ newScale: CGFloat) -> CGFloat {
+        let validatedScale = min(max(newScale, minScale), maxScale)
+        DispatchQueue.main.async {
+            self.calculateDragLimits()
+        }
+        return validatedScale
+    }
+    
+}
